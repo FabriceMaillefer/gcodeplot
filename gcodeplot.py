@@ -16,6 +16,7 @@ from gcodeplotutils.evaluate import evaluate
 SCALE_NONE = 0
 SCALE_DOWN_ONLY = 1
 SCALE_FIT = 2
+SCALE_CALIBRATE = 3
 ALIGN_NONE = 0
 ALIGN_BOTTOM = 1
 ALIGN_TOP = 2
@@ -25,13 +26,13 @@ ALIGN_CENTER = 3
 
 class Plotter(object):
     def __init__(self, xyMin=(7,8), xyMax=(204,178),
-            drawSpeed=35, moveSpeed=40, zSpeed=5, workZ = 14.5, liftDeltaZ = 2.5, safeDeltaZ = 20,
+            drawSpeed=400, moveSpeed=2000, zSpeed=5, workZ = 14.5, liftDeltaZ = 2.5, safeDeltaZ = 20,
             liftCommand="M4 P0",
 			safeLiftCommand=None,
 			downCommand="M4 P254",
 			comment=";",
             initCode = "M4 P0",
-            endCode =	"M4 P0"
+            endCode =	"M4 P0|"
 						"G00 X0.0000 Y0.0000 F2000.000000"):
         self.xyMin = xyMin
         self.xyMax = xyMax
@@ -113,6 +114,9 @@ class Scale(object):
 
     def __repr__(self):
         return str(self.scale)+','+str(self.offset)
+
+    def calibrate(self, factor):
+        self.scale = [factor, factor]
 
     def fit(self, plotter, xyMin, xyMax):
         s = [0,0]
@@ -323,7 +327,7 @@ def penColor(pens, pen):
     else:
         return (0.,0.,0.)
 
-def emitGcode(data, pens = {}, plotter=Plotter(), scalingMode=SCALE_NONE, align = None, tolerance=0, gcodePause="@pause", pauseAtStart = False, simulation = False):
+def emitGcode(data, pens = {}, plotter=Plotter(), scalingMode=SCALE_NONE, align = None, tolerance=0, gcodePause="@pause", pauseAtStart = False, simulation = False, calibrationFactor = 1.):
     if len(data) == 0:
         return None
 
@@ -348,6 +352,9 @@ def emitGcode(data, pens = {}, plotter=Plotter(), scalingMode=SCALE_NONE, align 
         if not allFit:
             sys.stderr.write("Drawing out of range: "+str(xyMin)+" "+str(xyMax)+"\n")
             return None
+    elif scalingMode == SCALE_CALIBRATE:
+        scale = Scale()
+        scale.calibrate(calibrationFactor)
     elif scalingMode != SCALE_DOWN_ONLY or not allFit:
         if xyMin[0] > xyMax[0]:
             return None
@@ -372,12 +379,12 @@ def emitGcode(data, pens = {}, plotter=Plotter(), scalingMode=SCALE_NONE, align 
             if lift:
                 gcode.extend(processCode(lift))
             else:
-                gcode.append('G00 F%.1f Z%.3f; pen park !!Zpark' % (plotter.zSpeed*60., plotter.safeUpZ))
+                gcode.append('G00 F%.1f Z%.3f; pen park !!Zpark' % (plotter.zSpeed, plotter.safeUpZ))
 
     park()
     if not simulation:
-        gcode.append('G00 F%.1f Y%.3f; !!Ybottom' % (plotter.moveSpeed*60.,   plotter.xyMin[1]))
-        gcode.append('G00 F%.1f X%.3f; !!Xleft' % (plotter.moveSpeed*60.,   plotter.xyMin[0]))
+        gcode.append('G00 F%.1f Y%.3f; !!Ybottom' % (plotter.moveSpeed,   plotter.xyMin[1]))
+        gcode.append('G00 F%.1f X%.3f; !!Xleft' % (plotter.moveSpeed,   plotter.xyMin[0]))
 
     class State(object):
         pass
@@ -397,7 +404,7 @@ def emitGcode(data, pens = {}, plotter=Plotter(), scalingMode=SCALE_NONE, align 
                 if plotter.liftCommand:
                     gcode.extend(processCode(plotter.liftCommand))
                 else:
-                    gcode.append('G00 F%.1f Z%.3f; pen up !!Zup' % (plotter.zSpeed*60., plotter.penUpZ))
+                    gcode.append('G00 F%.1f Z%.3f; pen up !!Zup' % (plotter.zSpeed, plotter.penUpZ))
             if state.curZ is not None:
                 state.time += abs(plotter.penUpZ-state.curZ) / plotter.zSpeed
             state.curZ = plotter.penUpZ
@@ -408,7 +415,7 @@ def emitGcode(data, pens = {}, plotter=Plotter(), scalingMode=SCALE_NONE, align 
                 if plotter.downCommand:
                     gcode.extend(processCode(plotter.downCommand))
                 else:
-                    gcode.append('G00 F%.1f Z%.3f; pen down !!Zwork' % (plotter.zSpeed*60., plotter.workZ))
+                    gcode.append('G00 F%.1f Z%.3f; pen down !!Zwork' % (plotter.zSpeed, plotter.workZ))
             state.time += abs(state.curZ-plotter.workZ) / plotter.zSpeed
             state.curZ = plotter.workZ
 
@@ -426,7 +433,7 @@ def emitGcode(data, pens = {}, plotter=Plotter(), scalingMode=SCALE_NONE, align 
                 penUp(force=force)
             if not simulation:
                 gcode.append('G0%d F%.1f X%.3f Y%.3f; %s !!Xleft+%.3f Ybottom+%.3f' % (
-                    1 if down else 0, speed*60., p[0], p[1], "draw" if down else "move",
+                    1 if down else 0, speed, p[0], p[1], "draw" if down else "move",
                     p[0]-plotter.xyMin[0], p[1]-plotter.xyMin[1]))
             else:
                 start = state.curXY if state.curXY is not None else plotter.xyMin
@@ -736,13 +743,13 @@ if __name__ == '__main__':
  The options with an asterisk are default off and can be turned off again by adding "no-" at the beginning to the long-form option, e.g., --no-stroke-all or --no-send.
 """)
 
-
+    calibrationFactor=193.142/196.5
     tolerance = 0.1
     doDedup = True
     sendPort = None
     sendSpeed = 115200
     hpglLength = 279.4
-    scalingMode = SCALE_NONE
+    scalingMode = SCALE_CALIBRATE
     shader = Shader()
     align = [ALIGN_NONE, ALIGN_NONE]
     plotter = Plotter()
@@ -810,6 +817,8 @@ if __name__ == '__main__':
                     scalingMode = SCALE_DOWN_ONLY
                 elif arg.startswith('f'):
                     scalingMode = SCALE_FIT
+                elif arg.startswith('c'):
+                    scalingMode = SCALE_CALIBRATE
             elif opt in ('-x', '--align-x'):
                 arg = arg.lower()
                 if arg.startswith('l'):
@@ -981,6 +990,8 @@ if __name__ == '__main__':
             print('scale=none')
         elif scalingMode == SCALE_DOWN_ONLY:
             print('scale=down')
+        elif scalingMode == SCALE_CALIBRATE:
+            print('scale=calibrate')
         else:
             print('scale=fit')
 
@@ -1121,7 +1132,7 @@ if __name__ == '__main__':
         g = emitHPGL(penData, pens=pens)
     else:
         g = emitGcode(penData, align=align, scalingMode=scalingMode, tolerance=tolerance,
-                plotter=plotter, gcodePause=gcodePause, pens=pens, pauseAtStart=pauseAtStart, simulation=svgSimulation)
+                plotter=plotter, gcodePause=gcodePause, pens=pens, pauseAtStart=pauseAtStart, simulation=svgSimulation, calibrationFactor=calibrationFactor)
 
     if g:
         dump = True
