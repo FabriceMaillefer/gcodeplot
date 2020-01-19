@@ -26,18 +26,13 @@ ALIGN_CENTER = 3
 class Plotter(object):
     def __init__(self, xyMin=(7,8), xyMax=(204,178),
             drawSpeed=35, moveSpeed=40, zSpeed=5, workZ = 14.5, liftDeltaZ = 2.5, safeDeltaZ = 20,
-            liftCommand=None, safeLiftCommand=None, downCommand=None, comment=";",
-            initCode = "G00 S1; endstops|"
-                       "G00 E0; no extrusion|"
-                       "G01 S1; endstops|"
-                       "G01 E0; no extrusion|"
-                       "G21; millimeters|"
-                       "G91 G0 F%.1f{{zspeed*60}} Z%.3f{{safe}}; pen park !!Zsafe|"
-                       "G90; absolute|"
-                       "G28 X; home|"
-                       "G28 Y; home|"
-                       "G28 Z; home",
-            endCode=None):
+            liftCommand="M4 P0",
+			safeLiftCommand=None,
+			downCommand="M4 P254",
+			comment=";",
+            initCode = "M4 P0",
+            endCode =	"M4 P0"
+						"G00 X0.0000 Y0.0000 F2000.000000"):
         self.xyMin = xyMin
         self.xyMax = xyMax
         self.drawSpeed = drawSpeed
@@ -742,7 +737,7 @@ if __name__ == '__main__':
 """)
 
 
-    tolerance = 0.05
+    tolerance = 0.1
     doDedup = True
     sendPort = None
     sendSpeed = 115200
@@ -752,7 +747,7 @@ if __name__ == '__main__':
     align = [ALIGN_NONE, ALIGN_NONE]
     plotter = Plotter()
     hpglOut = False
-    strokeAll = False
+    strokeAll = True
     extractColor = None
     gcodePause = "@pause"
     optimizationTime = 30

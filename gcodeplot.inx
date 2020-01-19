@@ -90,7 +90,7 @@
   <output>
     <extension>.gcode</extension>
     <mimetype>text/plain</mimetype>
-    <_filetypename>3-axis gcode plotter (*.gcode)</_filetypename>
+    <_filetypename>mLaser gcode (*.gcode)</_filetypename>
     <_filetypetooltip>Export 3-axis gcode plotter file</_filetypetooltip>
     <dataloss>true</dataloss>
   </output>
