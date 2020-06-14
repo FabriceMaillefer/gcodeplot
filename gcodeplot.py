@@ -432,9 +432,8 @@ def emitGcode(data, pens = {}, plotter=Plotter(), scalingMode=SCALE_NONE, align 
             else:
                 penUp(force=force)
             if not simulation:
-                gcode.append('G0%d F%.1f X%.3f Y%.3f; %s !!Xleft+%.3f Ybottom+%.3f' % (
-                    1 if down else 0, speed, p[0], p[1], "draw" if down else "move",
-                    p[0]-plotter.xyMin[0], p[1]-plotter.xyMin[1]))
+                gcode.append('G0%d F%.1f X%.3f Y%.3f' % (
+                    1 if down else 0, speed, p[0], p[1]))
             else:
                 start = state.curXY if state.curXY is not None else plotter.xyMin
                 color = [int(math.floor(255*x+0.5)) for x in (state.penColor if down else (0,0.5,0))]
@@ -455,7 +454,7 @@ def emitGcode(data, pens = {}, plotter=Plotter(), scalingMode=SCALE_NONE, align 
             state.curXY = p
 
     for pen in sorted(data):
-        if pen is not 1:
+        if pen != 1:
             state.curZ = None
             state.curXY = None
 
